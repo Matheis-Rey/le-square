@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../config/theme.dart';
+import '../../services/store_service.dart';
+import '../../services/auth_service.dart';
+import 'home_dashboard.dart';
 
 class StoreSetupScreen extends StatefulWidget {
   const StoreSetupScreen({super.key});
@@ -12,6 +15,39 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _descController = TextEditingController();
+  final StoreService _storeService = StoreService();
+  final AuthService _authService = AuthService();
+  bool _isLoading = false;
+
+  Future<void> _createStore() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final userId = _authService.currentUser?.id;
+    if (userId == null) return;
+
+    setState(() => _isLoading = true);
+
+    final result = await _storeService.createStore(
+      ownerId: userId,
+      name: _nameController.text.trim(),
+      description: _descController.text.trim().isNotEmpty ? _descController.text.trim() : null,
+    );
+
+    setState(() => _isLoading = false);
+
+    if (mounted) {
+      if (result['success']) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Boutique créée avec succès ! 🎉'), backgroundColor: AppColors.success),
+        );
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeDashboard()));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['message'] ?? 'Erreur'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,18 +66,11 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Présentation de votre boutique',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.whiteSoft),
-                ),
+                const Text('Présentation de votre boutique', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.whiteSoft)),
                 const SizedBox(height: 8),
-                const Text(
-                  'Les informations que vous saisirez apparaîtront sur votre vitrine publique.',
-                  style: TextStyle(fontSize: 14, color: Colors.grey),
-                ),
+                const Text('Les informations que vous saisirez apparaîtront sur votre vitrine publique.', style: TextStyle(fontSize: 14, color: Colors.grey)),
                 const SizedBox(height: 32),
 
-                // Nom de la boutique
                 TextFormField(
                   controller: _nameController,
                   style: const TextStyle(color: AppColors.whiteSoft),
@@ -53,7 +82,6 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Description
                 TextFormField(
                   controller: _descController,
                   maxLines: 4,
@@ -65,18 +93,17 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
                 ),
                 const SizedBox(height: 40),
 
-                // Bouton valider
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
-                      if (_formKey.currentState!.validate()) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Boutique créée avec succès !'), backgroundColor: AppColors.success),
-                        );
-                      }
-                    },
-                    child: const Text('Créer ma boutique'),
+                    onPressed: _isLoading ? null : _createStore,
+                    child: _isLoading
+                        ? const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            CircularProgressIndicator(color: AppColors.black, strokeWidth: 2),
+                            SizedBox(width: 12),
+                            Text('Création en cours...'),
+                          ])
+                        : const Text('Créer ma boutique'),
                   ),
                 ),
               ],
